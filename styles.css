@@ -1,0 +1,451 @@
+:root {
+  --bg: #f6f4ef;
+  --panel: #ffffff;
+  --text: #1f1d1a;
+  --muted: #6b665e;
+  --line: #ddd8ce;
+  --accent: #d9480f;
+  --accent-soft: #ffe8d9;
+  --chord: #1864ab;
+  --cursor: rgba(217, 72, 15, 0.18);
+  --current: #fffaf0;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17181b;
+    --panel: #212226;
+    --text: #e9e7e2;
+    --muted: #9a968e;
+    --line: #34353a;
+    --accent: #ff7a3d;
+    --accent-soft: #4a2a1a;
+    --chord: #74c0fc;
+    --cursor: rgba(255, 122, 61, 0.22);
+    --current: #1d1e22;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+select,
+input[type='number'],
+input:not([type]) {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button.primary,
+button.play {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--chord);
+  text-decoration: underline;
+}
+
+input[type='number'] {
+  width: 4.5em;
+  padding: 4px 6px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.top h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.library {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.library select {
+  max-width: 60vw;
+}
+
+#controls {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  padding: 0 16px 8px;
+}
+
+.progress {
+  height: 3px;
+  margin: 0 -16px 8px;
+  background: var(--line);
+}
+
+#progress {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.transport .play {
+  min-width: 7.5em;
+  font-size: 17px;
+}
+
+.tempo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tempo input[type='range'] {
+  width: 160px;
+  accent-color: var(--accent);
+}
+
+.unit {
+  color: var(--muted);
+}
+
+.now {
+  margin-left: auto;
+  text-align: center;
+  min-width: 6em;
+}
+
+.chord-now {
+  font: 700 28px/1.1 var(--mono);
+  color: var(--chord);
+}
+
+.chord-next {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chord-next span {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.position {
+  text-align: center;
+  min-width: 7em;
+  font-variant-numeric: tabular-nums;
+}
+
+.beats {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.beats span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.beats span:first-child {
+  outline: 2px solid var(--line);
+  outline-offset: 1px;
+}
+
+.beats span.on {
+  background: var(--accent);
+}
+
+.beats.count span.on {
+  background: var(--chord);
+}
+
+.toggles {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toggles input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+.toggles .sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+}
+
+main {
+  padding: 12px 16px 40px;
+  max-width: 1400px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 13px;
+  margin-left: 6px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px 16px;
+  margin-top: 10px;
+}
+
+.grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.grid input[type='range'] {
+  accent-color: var(--accent);
+}
+
+.grid input[type='number'] {
+  width: 100%;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+kbd,
+code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+/* ----- the tab sheet ----- */
+
+.sheet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  overflow-x: auto;
+  font: 15px/1.35 var(--mono);
+}
+
+.line {
+  white-space: pre;
+  min-height: 1.35em;
+}
+
+.line.section {
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.line.chords {
+  font-weight: 700;
+}
+
+.stave {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.stave.current {
+  background: var(--current);
+}
+
+.cursor {
+  display: none;
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 0;
+  width: 1ch;
+  background: var(--cursor);
+  border-left: 2px solid var(--accent);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.chord,
+.note {
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.chord {
+  color: var(--chord);
+}
+
+.chord.active {
+  background: var(--chord);
+  color: var(--panel);
+  box-shadow: 0 0 0 3px var(--chord);
+}
+
+.note:hover,
+.chord:hover {
+  outline: 1px solid var(--accent);
+}
+
+.note.hit {
+  animation: hit 0.45s ease-out;
+}
+
+@keyframes hit {
+  from {
+    background: var(--accent);
+    color: #fff;
+  }
+  to {
+    background: transparent;
+  }
+}
+
+/* ----- editor dialog ----- */
+
+dialog {
+  width: min(900px, 96vw);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 16px 20px;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+dialog h2 {
+  margin: 0 0 6px;
+}
+
+dialog ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+dialog input:not([type]) {
+  width: 100%;
+}
+
+#ed-text {
+  width: 100%;
+  height: 48vh;
+  margin-top: 12px;
+  font: 13px/1.35 var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  white-space: pre;
+  overflow: auto;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .now {
+    margin-left: 0;
+  }
+  .tempo input[type='range'] {
+    width: 110px;
+  }
+  .sheet {
+    font-size: 13px;
+  }
+}

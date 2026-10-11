@@ -1,0 +1,11 @@
+{
+  "name": "guitarhero",
+  "version": "0.1.0",
+  "description": "Play-along guitar tab practice app: tabs, tempo, metronome, backing drums and bass.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

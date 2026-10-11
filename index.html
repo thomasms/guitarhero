@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tab Trainer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>🎸 Tab Trainer</h1>
+      <div class="library">
+        <label class="sr-only" for="song-select">Song</label>
+        <select id="song-select"></select>
+        <button id="new-song" class="primary">+ Add song</button>
+        <button id="edit-song">Edit</button>
+        <button id="delete-song" title="Delete this song">Delete</button>
+      </div>
+    </header>
+
+    <section id="controls">
+      <div class="progress"><div id="progress"></div></div>
+      <div class="row transport">
+        <button id="play" class="play">▶ Play</button>
+        <button id="stop" title="Stop and go back to the start">■ Stop</button>
+
+        <div class="tempo">
+          <button id="slower" title="Slower (↓)">−</button>
+          <input id="bpm-range" type="range" min="30" max="240" value="90" aria-label="Tempo" />
+          <button id="faster" title="Faster (↑)">+</button>
+          <input id="bpm" type="number" min="20" max="300" value="90" aria-label="BPM" />
+          <span class="unit">BPM</span>
+          <button id="tap" title="Tap 3 or more times to set the tempo">Tap</button>
+        </div>
+
+        <div class="now">
+          <div class="chord-now" id="chord-now">–</div>
+          <div class="chord-next">next <span id="chord-next"></span></div>
+        </div>
+        <div class="position">
+          <div id="bar">Bar 1</div>
+          <div id="beats" class="beats"></div>
+        </div>
+      </div>
+
+      <div class="row toggles">
+        <label><input type="checkbox" id="countIn" /> Count-in</label>
+        <label><input type="checkbox" id="metronome" /> Metronome</label>
+        <label><input type="checkbox" id="guitar" /> Play tab notes</label>
+        <label><input type="checkbox" id="follow" /> Auto-scroll</label>
+        <span class="sep"></span>
+        <label><input type="checkbox" id="loop" /> Loop bars</label>
+        <input id="loop-from" type="number" min="1" value="1" aria-label="Loop from bar" />
+        <span>to</span>
+        <input id="loop-to" type="number" min="1" value="1" aria-label="Loop to bar" />
+        <button id="loop-here" title="Start the loop at the current bar">From here</button>
+        <label title="Make the tempo faster after each loop">
+          Speed up +<input id="speedup" type="number" min="0" max="20" value="0" /> BPM/loop, max
+          <input id="speedup-max" type="number" min="30" max="300" value="160" />
+        </label>
+      </div>
+    </section>
+
+    <main>
+      <details class="panel" open>
+        <summary>Band &amp; mixer</summary>
+        <div class="grid">
+          <label>Drums <select id="drums"></select></label>
+          <label>Bass <select id="bass"></select></label>
+          <label>Tab notes <input type="range" min="0" max="1" step="0.05" data-volume="guitar" /></label>
+          <label>Bass vol. <input type="range" min="0" max="1" step="0.05" data-volume="bass" /></label>
+          <label>Drums vol. <input type="range" min="0" max="1" step="0.05" data-volume="drums" /></label>
+          <label>Click vol. <input type="range" min="0" max="1" step="0.05" data-volume="click" /></label>
+        </div>
+      </details>
+      <details class="panel">
+        <summary>Song timing <span id="song-info" class="muted"></span></summary>
+        <div class="grid">
+          <label title="Time signature: beats in one bar">Beats per bar <input id="bpb" type="number" min="1" max="12" /></label>
+          <label title="For chord sheets: how long each chord lasts">Beats per chord <input id="bpc" type="number" min="1" max="32" /></label>
+          <label title="For tabs without bar lines: how many characters make one beat">Tab chars per beat <input id="cpb" type="number" min="1" max="16" /></label>
+        </div>
+        <p class="hint">
+          Tabs with bar lines (<code>|</code>) get one bar per measure. Chord sheets get one chord per
+          “beats per chord”. Click any note or chord to jump to it.
+        </p>
+      </details>
+
+      <p id="empty" class="hint" hidden>No tab or chords found. Click <b>Edit</b> and paste a tab.</p>
+      <div id="sheet" class="sheet"></div>
+      <p class="hint keys">
+        Keys: <kbd>Space</kbd> play/pause · <kbd>←</kbd>/<kbd>→</kbd> bar · <kbd>↑</kbd>/<kbd>↓</kbd> tempo ·
+        <kbd>L</kbd> loop · <kbd>M</kbd> metronome ·
+        <button id="restore-samples" class="link">restore example songs</button>
+      </p>
+    </main>
+
+    <dialog id="editor">
+      <form id="editor-form" method="dialog">
+        <h2 id="ed-heading">Add a song</h2>
+        <ol class="hint">
+          <li>Open the song on Ultimate Guitar (or any tab site).</li>
+          <li>Select the tab or chord text on the page and copy it (Ctrl/Cmd + C).</li>
+          <li>Paste it below. Tab lines like <code>e|---0---|</code> and chord lines like <code>Am  F  C</code> are detected.</li>
+        </ol>
+        <div class="grid">
+          <label>Title <input id="ed-title" /></label>
+          <label>Artist <input id="ed-artist" /></label>
+          <label>Tempo (BPM) <input id="ed-bpm" type="number" min="20" max="300" /></label>
+          <label>Beats per bar <input id="ed-bpb" type="number" min="1" max="12" /></label>
+        </div>
+        <textarea id="ed-text" spellcheck="false" placeholder="e|-----0-----|&#10;B|---1---1---|&#10;..."></textarea>
+        <div class="actions">
+          <button type="button" id="ed-cancel">Cancel</button>
+          <button type="submit" class="primary">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>
