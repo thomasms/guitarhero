@@ -148,7 +148,10 @@ function staveMeasures(lines, contentStart, opts) {
     // Most tabs pad each bar with one leading dash ("|-0---2---|"): skip it.
     const lead = lines.every((l) => (l[s.colStart] || '-') === '-') ? 1 : 0;
     const width = s.colEnd - s.colStart;
-    const beats = useBars ? opts.beatsPerBar : Math.max(1, Math.round(width / opts.charsPerBeat));
+    // Without bar lines, guess the length from the width, rounded to whole bars
+    // so that the tab stays in step with the bars (and the drums).
+    const bpb = opts.beatsPerBar;
+    const beats = useBars ? bpb : Math.max(1, Math.round(width / opts.charsPerBeat / bpb)) * bpb;
     const m = { ...s, lead, beats, beatsPerCol: beats / width };
     if (useBars) m.beatsPerCol = gridScale(lines, m) ?? m.beatsPerCol;
     return m;
@@ -313,6 +316,8 @@ export function parseSong(rawText, options = {}) {
             string: s,
             fret,
             muted: fret === 'x',
+            // Technique to the next note: hammer-on, pull-off, slide, bend, vibrato, release.
+            tech: /[hpb\/\\~r]/.test(line[c + len] || '') ? line[c + len] : '',
             midi: fret === 'x' ? tuning[s] + capo : tuning[s] + fret + capo,
             line: idx[s],
             col: c,

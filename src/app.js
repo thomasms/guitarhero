@@ -1,4 +1,5 @@
-import { parseSong, beatToCol, beatAtCol, chordIndexAt } from './parser.js';
+import { parseSong, chordIndexAt } from './parser.js';
+import { renderTab, renderText, beatAtClick } from './render.js';
 import { Player, DRUM_STYLES, BASS_STYLES } from './player.js';
 import { loadSongs, saveSongs, loadSettings, saveSettings } from './storage.js';
 import { SAMPLES } from './samples.js';
@@ -28,83 +29,18 @@ const persistSettings = () => saveSettings(settings);
 // ---------------------------------------------------------------- helpers
 const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-function lineHtml(text, spans) {
-  spans.sort((a, b) => a.col - b.col);
-  let html = '';
-  let pos = 0;
-  for (const s of spans) {
-    if (s.col < pos) continue;
-    html += escapeHtml(text.slice(pos, s.col));
-    html += `<span class="${s.cls}" data-${s.kind}="${s.id}">${escapeHtml(text.slice(s.col, s.col + s.len))}</span>`;
-    pos = s.col + s.len;
-  }
-  return html + escapeHtml(text.slice(pos)) || '&nbsp;';
-}
-
-function measureCharWidth(el) {
-  const probe = document.createElement('span');
-  probe.textContent = 'M'.repeat(100);
-  probe.style.visibility = 'hidden';
-  probe.style.position = 'absolute';
-  el.appendChild(probe);
-  const w = probe.getBoundingClientRect().width / 100;
-  probe.remove();
-  return w;
-}
-
 // ---------------------------------------------------------------- render
 function render() {
   const sheet = $('#sheet');
   sheet.innerHTML = '';
   if (!parsed) return;
-
-  const spansByLine = new Map();
-  const addSpan = (line, span) => {
-    if (!spansByLine.has(line)) spansByLine.set(line, []);
-    spansByLine.get(line).push(span);
-  };
-  for (const n of parsed.notes) addSpan(n.line, { col: n.col, len: n.len, cls: 'note', kind: 'note', id: n.id });
-  for (const c of parsed.chords) addSpan(c.line, { col: c.col, len: c.len, cls: 'chord', kind: 'chord', id: c.id });
-  // Chords that are not in the timeline (rare) still get chord styling.
-  for (const b of parsed.blocks) {
-    if (b.type === 'chords' && !b.timed) for (const c of b.chords) addSpan(b.line, { col: c.col, len: c.len, cls: 'chord', kind: 'x', id: '' });
-  }
-
-  const makeLine = (i, cls) => {
-    const div = document.createElement('div');
-    div.className = `line ${cls}`;
-    div.innerHTML = lineHtml(parsed.lines[i], spansByLine.get(i) || []);
-    return div;
-  };
-
-  view = { staves: [], chordEls: [], noteEls: [], chordLines: [] };
-  for (const b of parsed.blocks) {
-    if (b.type === 'stave') {
-      const wrap = document.createElement('div');
-      wrap.className = 'stave';
-      wrap.dataset.stave = b.index;
-      for (let k = 0; k < b.lineCount; k++) wrap.appendChild(makeLine(b.lineStart + k, 'tab'));
-      const cursor = document.createElement('div');
-      cursor.className = 'cursor';
-      wrap.appendChild(cursor);
-      sheet.appendChild(wrap);
-      view.staves.push({ block: b, el: wrap, cursor });
-    } else if (b.type === 'chords') {
-      const el = makeLine(b.line, 'chords');
-      sheet.appendChild(el);
-      if (b.timed && b.startBeat !== undefined) view.chordLines.push({ block: b, el });
-    } else {
-      sheet.appendChild(makeLine(b.line, b.type));
-    }
-  }
-  sheet.querySelectorAll('[data-chord]').forEach((el) => (view.chordEls[el.dataset.chord] = el));
-  sheet.querySelectorAll('[data-note]').forEach((el) => (view.noteEls[el.dataset.note] = el));
-  view.charWidth = measureCharWidth(sheet);
-  view.activeChord = -1;
+  view = settings.textView ? renderText(sheet, parsed) : renderTab(sheet, parsed);
+  view.width = sheet.clientWidth;
+  view.activeChord = -2; // forces the chord display to update on the next frame
   view.activeBlockEl = null;
+  view.activeTrack = null;
   view.lastPos = -Infinity;
   view.noteIdx = 0;
-
   $('#empty').hidden = parsed.notes.length > 0 || parsed.chords.length > 0;
 }
 
@@ -268,16 +204,17 @@ function frame() {
 
   // Tab cursor.
   let activeEl = null;
-  for (const s of view.staves) {
-    const b = s.block;
-    const inside = pos >= b.startBeat && pos < b.endBeat;
-    s.cursor.style.display = inside ? 'block' : 'none';
-    if (inside) {
-      s.cursor.style.transform = `translateX(${beatToCol(b, pos) * view.charWidth}px)`;
-      activeEl = s.el;
-    }
+  const track = view.tracks.find((t) => pos >= t.startBeat && pos < t.endBeat) || null;
+  if (track !== view.activeTrack) {
+    if (view.activeTrack) view.activeTrack.cursor.style.display = 'none';
+    if (track) track.cursor.style.display = 'block';
+    view.activeTrack = track;
   }
-  if (!activeEl && ci >= 0) activeEl = view.chordEls[ci]?.parentElement;
+  if (track) {
+    track.cursor.style.transform = `translateX(${track.xAt(pos)}px)`;
+    activeEl = track.el;
+  }
+  if (!activeEl && ci >= 0) activeEl = view.chordEls[ci]?.closest('.lyricline, .chordrow, .line');
 
   // Flash notes as they sound.
   if (pos < view.lastPos - 0.01) {
@@ -406,6 +343,7 @@ function init() {
     $(`#${key}`).checked = settings[key];
   }
   $('#follow').checked = settings.follow;
+  $('#textView').checked = !!settings.textView;
 
   // Events.
   $('#play').addEventListener('click', togglePlay);
@@ -434,6 +372,11 @@ function init() {
       persistSettings();
     });
   }
+  $('#textView').addEventListener('change', (e) => {
+    settings.textView = e.target.checked;
+    persistSettings();
+    render();
+  });
   $('#follow').addEventListener('change', (e) => {
     settings.follow = e.target.checked;
     persistSettings();
@@ -504,19 +447,9 @@ function init() {
 
   // Click a note, a chord or a place in the tab to jump there.
   $('#sheet').addEventListener('click', (e) => {
-    if (!parsed) return;
-    let beat = null;
-    const note = e.target.closest('[data-note]');
-    const chord = e.target.closest('[data-chord]');
-    const stave = e.target.closest('.stave');
-    if (note) beat = parsed.notes[note.dataset.note].beat;
-    else if (chord) beat = parsed.chords[chord.dataset.chord].beat;
-    else if (stave) {
-      const col = (e.clientX - stave.getBoundingClientRect().left - stave.clientLeft) / view.charWidth;
-      beat = Math.floor(beatAtCol(view.staves[stave.dataset.stave].block, col) * 2) / 2;
-    }
-    if (beat === null) return;
-    player.seek(beat);
+    if (!parsed || !view) return;
+    const beat = beatAtClick(view, parsed, e);
+    if (beat !== null) player.seek(beat);
   });
 
   document.addEventListener('keydown', (e) => {
@@ -548,8 +481,13 @@ function init() {
     }
   });
 
+  // The tab view wraps bars to the page width, so draw it again on resize.
+  let resizeTimer;
   window.addEventListener('resize', () => {
-    if (view) view.charWidth = measureCharWidth($('#sheet'));
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (view && $('#sheet').clientWidth !== view.width) render();
+    }, 150);
   });
 
   persistSongs();

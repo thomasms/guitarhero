@@ -24,6 +24,11 @@ Any static web server also works (for example `python3 -m http.server`).
   finds tab staves (`e|--0--|`), chord lines (`Am   F   C`) and section labels
   (`[Verse]`). Ultimate Guitar `[ch]`/`[tab]` markup is removed. A `Capo: N`
   line is used for the backing bass.
+- **Clean, standard display.** Tabs are drawn as real string lines with round
+  fret markers, evenly spaced by beat, with bar numbers and chord names, and
+  wrapped to fit the screen. Hammer-ons, pull-offs, slides, bends and muted
+  notes are marked. Chord sheets show chords above the lyrics. Tick
+  **Original text** to see the tab as it was pasted.
 - **Play along.** A cursor moves through the tab, notes flash when they sound,
   and the current and next chord show in large text. Click a note, chord or
   place in the tab to jump there.
@@ -44,7 +49,8 @@ ASCII tabs do not contain exact rhythm, so the app makes a guess:
 
 - In a tab with bar lines, each measure is one bar ("Beats per bar"). The note
   spacing in the bar is used to find the rhythm grid.
-- In a tab without bar lines, "Tab chars per beat" sets the speed.
+- In a tab without bar lines, "Tab chars per beat" sets the speed. The length
+  is rounded to whole bars.
 - In a chord sheet, each chord lasts "Beats per chord".
 
 Change these values in **Song timing** if the playback does not match the song.
@@ -69,7 +75,8 @@ belong to their authors, so keep them for your own practice.
 | `src/parser.js` | Turns tab text into timed notes and chords |
 | `src/player.js` | Look-ahead scheduler, loop, count-in, drum and bass patterns |
 | `src/audio.js` | Web Audio synth sounds (pluck, bass, drums, click) |
-| `src/app.js` | UI, rendering and controls |
+| `src/app.js` | UI and controls |
+| `src/render.js` | Draws the tab and chord sheet (standard and text views) |
 | `src/ug.js` | Reads song data from an Ultimate Guitar page |
 | `server.js` | Static server and the `/api/ug` import endpoint |
 | `test/` | Parser tests (`node --test`) |
