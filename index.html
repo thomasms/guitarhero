@@ -98,11 +98,15 @@
     <dialog id="editor">
       <form id="editor-form" method="dialog">
         <h2 id="ed-heading">Add a song</h2>
-        <ol class="hint">
-          <li>Open the song on Ultimate Guitar (or any tab site).</li>
-          <li>Select the tab or chord text on the page and copy it (Ctrl/Cmd + C).</li>
-          <li>Paste it below. Tab lines like <code>e|---0---|</code> and chord lines like <code>Am  F  C</code> are detected.</li>
-        </ol>
+        <div class="import">
+          <input id="ed-url" type="url" placeholder="https://tabs.ultimate-guitar.com/tab/…" aria-label="Ultimate Guitar link" />
+          <button type="button" id="ed-import" class="primary">Import</button>
+        </div>
+        <p id="ed-status" class="hint" role="status"></p>
+        <p class="hint">
+          Paste an Ultimate Guitar link and click <b>Import</b>. Or copy the tab text from any site and paste
+          it below: tab lines like <code>e|---0---|</code> and chord lines like <code>Am  F  C</code> are detected.
+        </p>
         <div class="grid">
           <label>Title <input id="ed-title" /></label>
           <label>Artist <input id="ed-artist" /></label>

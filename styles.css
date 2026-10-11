@@ -408,9 +408,28 @@ dialog h2 {
   margin: 0 0 6px;
 }
 
-dialog ol {
-  margin: 0 0 8px;
-  padding-left: 20px;
+.import {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.import input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+#ed-status {
+  min-height: 1.2em;
+  margin: 6px 0 0;
+}
+
+#ed-status.error {
+  color: var(--accent);
 }
 
 dialog input:not([type]) {

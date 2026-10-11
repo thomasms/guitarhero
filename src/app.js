@@ -321,8 +321,43 @@ function openEditor(song) {
   $('#ed-bpb').value = song ? song.beatsPerBar || 4 : 4;
   $('#ed-text').value = song ? song.text : '';
   $('#ed-heading').textContent = song ? 'Edit song' : 'Add a song';
+  $('#ed-url').value = song?.source || '';
+  setImportStatus('');
   dlg.showModal();
-  (song ? $('#ed-text') : $('#ed-title')).focus();
+  (song ? $('#ed-text') : $('#ed-url')).focus();
+}
+
+function setImportStatus(message, isError = false) {
+  $('#ed-status').textContent = message;
+  $('#ed-status').classList.toggle('error', isError);
+}
+
+async function importFromUrl() {
+  const url = $('#ed-url').value.trim();
+  if (!url) return setImportStatus('Paste an Ultimate Guitar link first.', true);
+  const button = $('#ed-import');
+  button.disabled = true;
+  setImportStatus('Importing…');
+  try {
+    const res = await fetch(`api/ug?url=${encodeURIComponent(url)}`);
+    const isJson = (res.headers.get('content-type') || '').includes('json');
+    if (!isJson) throw new Error('Import needs the app server. Start the app with "npm start".');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Import failed (${res.status}).`);
+    $('#ed-title').value = data.title;
+    $('#ed-artist').value = data.artist;
+    if (data.bpm) $('#ed-bpm').value = data.bpm;
+    $('#ed-text').value = data.text;
+    const found = parseSong(data.text);
+    setImportStatus(
+      `Imported ${data.type ? data.type.toLowerCase() : 'song'}: ${found.chords.length} chords, ` +
+        `${found.notes.length} tab notes. Check the details, then click Save.`,
+    );
+  } catch (err) {
+    setImportStatus(err.message === 'Failed to fetch' ? 'Could not reach the app server.' : err.message, true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function saveEditor(e) {
@@ -334,6 +369,7 @@ function saveEditor(e) {
     artist: $('#ed-artist').value.trim(),
     bpm: Number($('#ed-bpm').value) || 90,
     beatsPerBar: Number($('#ed-bpb').value) || 4,
+    source: $('#ed-url').value.trim(),
     text,
   };
   let song = songs.find((s) => s.id === dlg.dataset.id);
@@ -458,6 +494,13 @@ function init() {
   });
   $('#editor-form').addEventListener('submit', saveEditor);
   $('#ed-cancel').addEventListener('click', () => $('#editor').close());
+  $('#ed-import').addEventListener('click', importFromUrl);
+  $('#ed-url').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      importFromUrl();
+    }
+  });
 
   // Click a note, a chord or a place in the tab to jump there.
   $('#sheet').addEventListener('click', (e) => {

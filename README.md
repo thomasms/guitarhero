@@ -17,7 +17,10 @@ Any static web server also works (for example `python3 -m http.server`).
 
 ## Features
 
-- **Tabs and chord sheets.** Paste text that you copy from a tab site. The app
+- **Import from a link.** In **Add song**, paste an Ultimate Guitar tab link
+  and click **Import**. The title, artist, tempo (if the page has one), capo and
+  tab text are filled in for you.
+- **Tabs and chord sheets.** Or paste text that you copy from a tab site. The app
   finds tab staves (`e|--0--|`), chord lines (`Am   F   C`) and section labels
   (`[Verse]`). Ultimate Guitar `[ch]`/`[tab]` markup is removed. A `Capo: N`
   line is used for the backing bass.
@@ -48,10 +51,16 @@ Change these values in **Song timing** if the playback does not match the song.
 
 ## Note about Ultimate Guitar
 
-The app does not download from Ultimate Guitar: their site does not allow
-other web pages to load their content. Copy the tab text from the page and paste
-it into **Add song**. Tabs on that site belong to their authors, so keep them
-for your own practice.
+Browsers do not let a web page read another site, so the import goes through
+the app's own server (`server.js`, endpoint `/api/ug`). Link import therefore
+works only when you start the app with `npm start`. The server only accepts
+`https://…ultimate-guitar.com` links.
+
+Import reads the tab data that Ultimate Guitar puts in its page. If Ultimate
+Guitar changes its page or blocks the request, import fails with a message:
+then copy the tab text from the page and paste it instead. "Official" and
+Guitar Pro tabs have no text, so they cannot be imported. Tabs on that site
+belong to their authors, so keep them for your own practice.
 
 ## Code
 
@@ -61,4 +70,6 @@ for your own practice.
 | `src/player.js` | Look-ahead scheduler, loop, count-in, drum and bass patterns |
 | `src/audio.js` | Web Audio synth sounds (pluck, bass, drums, click) |
 | `src/app.js` | UI, rendering and controls |
+| `src/ug.js` | Reads song data from an Ultimate Guitar page |
+| `server.js` | Static server and the `/api/ug` import endpoint |
 | `test/` | Parser tests (`node --test`) |
