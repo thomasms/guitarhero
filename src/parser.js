@@ -16,9 +16,6 @@ const CHORD_RE =
 
 const FILLER_RE = /^(?:\||\/|-+|\.+|%|x\d+|\d+x|\(x?\d+x?\)|N\.?C\.?|\(N\.?C\.?\))$/i;
 
-// Characters allowed in the body of a tab line.
-const TAB_BODY_RE = /^[-0-9|:hpbrxXtTsSvV\/\\~()<>.^*=+\s]+$/;
-
 export function pitchClass(name) {
   const m = /^([A-G])([#b]?)/.exec(name);
   if (!m) return null;
@@ -59,6 +56,12 @@ export function isChordLine(line) {
   return chords > 0;
 }
 
+// Index just after the tab content of a line (its last "|" or "-"), so that
+// trailing text such as "x2" or "(repeat)" is ignored.
+export function tabEnd(line) {
+  return Math.max(line.lastIndexOf('|'), line.lastIndexOf('-')) + 1;
+}
+
 // Returns { label, start } where start is the column where tab content begins,
 // or null if the line is not a tab line.
 export function tabLineInfo(line) {
@@ -69,12 +72,35 @@ export function tabLineInfo(line) {
     if (!/^\s*-/.test(line)) return null;
   }
   const start = m[0].length;
-  const body = line.slice(start).replace(/\s+\S{0,6}\s*$/, (s) => (/[-|]/.test(s) ? s : ''));
+  const body = line.slice(start, tabEnd(line));
   if (body.length < 4) return null;
   const dashes = (body.match(/-/g) || []).length;
-  if (dashes < 3 || dashes / body.length < 0.35) return null;
-  if (!TAB_BODY_RE.test(body)) return null;
+  if (dashes < 3 || dashes / body.length < 0.3) return null;
+  // Mostly dashes, digits and bar lines. Other symbols (h, p, b, ~, L, PM ...)
+  // are allowed, but not words.
+  const solid = body.replace(/\s/g, '');
+  const tabChars = (solid.match(/[-|0-9]/g) || []).length;
+  if (tabChars / solid.length < 0.7 || solid.length < body.length * 0.85) return null;
+  if (/[A-Za-z]{3,}/.test(body)) return null;
   return { label, start };
+}
+
+// A rhythm line above a tab, e.g. "S S S S Q  E  E  H." (W = whole, H = half,
+// Q = quarter, E = eighth, S = sixteenth, T = 32nd; "." = dotted).
+const RHYTHM_BEATS = { W: 4, H: 2, Q: 1, E: 0.5, S: 0.25, T: 0.125 };
+
+export function isRhythmLine(line) {
+  const t = line.trim();
+  if (!/^[WHQEST.|\s]+$/.test(t) || /[WHQEST]{2}/.test(t) || !/[WHQST]/.test(t)) return false;
+  return (t.match(/[WHQEST]/g) || []).length >= 2;
+}
+
+export function parseRhythm(line) {
+  const out = [];
+  const re = /([WHQEST])(\.?)/g;
+  let m;
+  while ((m = re.exec(line))) out.push({ col: m.index, beats: RHYTHM_BEATS[m[1]] * (m[2] ? 1.5 : 1) });
+  return out;
 }
 
 export function cleanText(raw) {
@@ -117,45 +143,85 @@ function splitGroup(group) {
   return out;
 }
 
-// Builds measures (time map) for a stave.
-function staveMeasures(lines, contentStart, opts) {
-  const contentEnd = Math.max(
-    ...lines.map((l) => {
-      const trimmed = l.replace(/\s+\S{0,6}\s*$/, (s) => (/[-|]/.test(s) ? s : '')).trimEnd();
-      return trimmed.length;
-    }),
-  );
-  const width = Math.max(...lines.map((l) => l.length));
+// Bar line positions in one line ("||" counts once), with the content start
+// and end added as bounds when there is no bar line there.
+function lineBars(line, contentStart) {
+  const end = tabEnd(line);
   const bars = [];
-  for (let c = Math.max(0, contentStart - 1); c < width; c++) {
-    if (lines.every((l) => l[c] === '|')) bars.push(c);
+  for (let c = Math.max(0, contentStart - 1); c < end; c++) {
+    if (line[c] === '|' && line[c + 1] !== '|') bars.push(c);
   }
-  // Segment boundaries: content start, each bar line, content end.
-  const bounds = [];
-  if (!bars.length || bars[0] > contentStart) bounds.push(contentStart - 1);
-  bounds.push(...bars);
-  if (bounds[bounds.length - 1] < contentEnd - 1) bounds.push(contentEnd);
+  if (!bars.length || bars[0] > contentStart + 1) bars.unshift(contentStart - 1);
+  if (end - 1 - bars[bars.length - 1] >= 2) bars.push(end);
+  return bars;
+}
+
+const isOnset = (line, c) => /[\dxX]/.test(line[c]) && !/\d/.test(line[c - 1] || '');
+
+// Builds the measures (time map) of a stave. Returns { measures, mapCol }:
+// mapCol(string, column) gives the column in the common (reference) layout.
+// Lines whose bar lines do not line up (common in hand-made tabs, where "10"
+// takes more space on one string) are stretched to match the longest line.
+function staveMeasures(lines, contentStart, opts) {
+  const perLine = lines.map((l) => lineBars(l, contentStart));
+  const same = perLine.every((b) => b.join() === perLine[0].join());
+  const sameCount = perLine.every((b) => b.length === perLine[0].length);
+  let bounds;
+  let mapCol = (s, c) => c;
+  if (same) {
+    bounds = perLine[0];
+  } else if (sameCount && perLine[0].length >= 2) {
+    const last = (b) => b[b.length - 1];
+    let ref = 0;
+    perLine.forEach((b, i) => {
+      if (last(b) > last(perLine[ref])) ref = i;
+    });
+    bounds = perLine[ref];
+    mapCol = (s, c) => {
+      const b = perLine[s];
+      let k = 0;
+      while (k + 2 < b.length && c > b[k + 1]) k++;
+      const f = (c - b[k]) / (b[k + 1] - b[k]);
+      return bounds[k] + f * (bounds[k + 1] - bounds[k]);
+    };
+  } else {
+    // Different bar counts per line: use only the bar lines all lines share.
+    const end = Math.max(...lines.map(tabEnd));
+    bounds = [contentStart - 1];
+    for (let c = contentStart; c < end; c++) {
+      if (lines.every((l) => l[c] === '|') && lines.some((l) => l[c + 1] !== '|')) bounds.push(c);
+    }
+    if (end - 1 - bounds[bounds.length - 1] >= 2) bounds.push(end);
+  }
+
   const segments = [];
   for (let i = 0; i + 1 < bounds.length; i++) {
     const colStart = bounds[i] + 1;
     const colEnd = bounds[i + 1];
     if (colEnd - colStart >= 2) segments.push({ colStart, colEnd });
   }
-  if (!segments.length) segments.push({ colStart: contentStart, colEnd: Math.max(contentStart + 2, contentEnd) });
+  if (!segments.length) segments.push({ colStart: contentStart, colEnd: contentStart + 2 });
+
+  // Note start columns, in the common layout.
+  const onsets = new Set();
+  lines.forEach((l, s) => {
+    for (let c = contentStart; c < tabEnd(l); c++) if (isOnset(l, c)) onsets.add(Math.round(mapCol(s, c)));
+  });
 
   const useBars = segments.length >= 2;
-  return segments.map((s) => {
+  const measures = segments.map((seg) => {
     // Most tabs pad each bar with one leading dash ("|-0---2---|"): skip it.
-    const lead = lines.every((l) => (l[s.colStart] || '-') === '-') ? 1 : 0;
-    const width = s.colEnd - s.colStart;
+    const lead = onsets.has(seg.colStart) ? 0 : 1;
+    const width = seg.colEnd - seg.colStart;
     // Without bar lines, guess the length from the width, rounded to whole bars
     // so that the tab stays in step with the bars (and the drums).
     const bpb = opts.beatsPerBar;
     const beats = useBars ? bpb : Math.max(1, Math.round(width / opts.charsPerBeat / bpb)) * bpb;
-    const m = { ...s, lead, beats, beatsPerCol: beats / width };
-    if (useBars) m.beatsPerCol = gridScale(lines, m) ?? m.beatsPerCol;
+    const m = { ...seg, lead, beats, beatsPerCol: beats / width };
+    if (useBars) m.beatsPerCol = gridScale([...onsets], m) ?? m.beatsPerCol;
     return m;
   });
+  return { measures, mapCol };
 }
 
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
@@ -163,13 +229,9 @@ const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 // Guess the rhythmic grid of a bar from the spacing of its notes. For example
 // "|-0---0---0---0---|" has notes every 4 columns, so 4 slots = 4 beats.
 // Returns beats per column, or null if no clear grid is found.
-function gridScale(lines, m) {
+function gridScale(onsetCols, m) {
   const onsets = new Set();
-  for (const l of lines) {
-    for (let c = m.colStart + m.lead; c < m.colEnd; c++) {
-      if (/[\dxX]/.test(l[c]) && !/\d/.test(l[c - 1] || '')) onsets.add(c - m.colStart - m.lead);
-    }
-  }
+  for (const c of onsetCols) if (c >= m.colStart + m.lead && c < m.colEnd) onsets.add(c - m.colStart - m.lead);
   const rel = [...onsets].sort((a, b) => a - b);
   if (rel.length < 2) return null;
   let d = 0;
@@ -195,6 +257,25 @@ function colToBeat(measures, col) {
     }
   }
   return 0;
+}
+
+// Uses a rhythm line (one letter per note) for exact timing. Only applied
+// when the number of letters matches the number of note starts.
+function applyRhythm(staveNotes, measures, rhythm) {
+  if (!rhythm) return;
+  const beats = [...new Set(staveNotes.map((n) => n.beat))].sort((a, b) => a - b);
+  if (beats.length !== rhythm.length) return;
+  const map = new Map();
+  let prev = null;
+  beats.forEach((b, i) => {
+    const m = measures.find((x) => b >= x.startBeat - 1e-6 && b < x.startBeat + x.beats - 1e-6) || measures[measures.length - 1];
+    const end = m.startBeat + m.beats;
+    let nb = b;
+    if (prev && prev.m === m) nb = Math.min(prev.beat + rhythm[i - 1].beats, end - 0.125);
+    map.set(b, nb);
+    prev = { m, beat: nb };
+  });
+  for (const n of staveNotes) n.beat = map.get(n.beat);
 }
 
 // Snap to a 16th-note grid: ASCII tab spacing is only approximate.
@@ -228,6 +309,7 @@ export function parseSong(rawText, options = {}) {
     if (info[i]) return 'tab';
     if (!l.trim()) return 'blank';
     if (/^\s*\[[^\]]+\]\s*$/.test(l)) return 'section';
+    if (isRhythmLine(l)) return 'rhythm';
     if (isChordLine(l)) return 'chords';
     return 'text';
   });
@@ -254,6 +336,14 @@ export function parseSong(rawText, options = {}) {
     i = j;
   }
 
+  // A rhythm line just above a stave (or above its chord line), or just below it.
+  const rhythmFor = (first, count) => {
+    for (const k of [first - 1, first - 2, first + count]) {
+      if (kinds[k] === 'rhythm' && (k !== first - 2 || kinds[first - 1] === 'chords')) return parseRhythm(lines[k]);
+    }
+    return null;
+  };
+
   // 3. Walk the lines and build the timeline.
   const blocks = [];
   const notes = [];
@@ -266,7 +356,7 @@ export function parseSong(rawText, options = {}) {
       const idx = staveAt.get(i);
       const sLines = idx.map((k) => lines[k]);
       const contentStart = Math.max(...idx.map((k) => info[k].start));
-      const measures = staveMeasures(sLines, contentStart, opts);
+      const { measures, mapCol } = staveMeasures(sLines, contentStart, opts);
       let b = beat;
       for (const m of measures) {
         m.startBeat = b;
@@ -296,7 +386,8 @@ export function parseSong(rawText, options = {}) {
 
       const staveNotes = [];
       sLines.forEach((line, s) => {
-        for (let c = contentStart; c < line.length; c++) {
+        const end = tabEnd(line);
+        for (let c = contentStart; c < end; c++) {
           const ch = line[c];
           let fret = null;
           let len = 1;
@@ -310,9 +401,8 @@ export function parseSong(rawText, options = {}) {
             fret = 'x';
           }
           if (fret === null) continue;
-          if (c >= measures[measures.length - 1].colEnd + 1) break; // trailing text, e.g. "x2"
           const note = {
-            beat: quantize(colToBeat(measures, c)),
+            beat: quantize(colToBeat(measures, mapCol(s, c))),
             string: s,
             fret,
             muted: fret === 'x',
@@ -328,6 +418,8 @@ export function parseSong(rawText, options = {}) {
           c += len - 1;
         }
       });
+      applyRhythm(staveNotes, measures, rhythmFor(i, idx.length));
+
       // Note length: until the next note on the same string (max 4 beats).
       staveNotes.sort((a, b2) => a.beat - b2.beat || a.string - b2.string);
       for (const n of staveNotes) {

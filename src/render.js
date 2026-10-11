@@ -21,7 +21,7 @@ const BOTTOM = 28; // px below the bottom string (bar numbers)
 const LABEL_W = 26; // px for the string names
 const PAD = 16; // px between a bar line and its first note
 const BASE_PX_PER_BEAT = 56;
-const MIN_NOTE_GAP = 24; // px between notes that follow each other
+const MIN_NOTE_GAP = 30; // px between notes that follow each other
 
 const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -50,8 +50,8 @@ function groupStaves(blocks) {
         currentGroup = [b];
         groups.set(b, currentGroup);
       }
-    } else if (b.type === 'blank' || (b.type === 'chords' && b.startBeat === undefined)) {
-      // Blank lines and chord lines attached to a stave do not break the flow.
+    } else if (b.type === 'blank' || b.type === 'rhythm' || (b.type === 'chords' && b.startBeat === undefined)) {
+      // Blank lines, rhythm lines and chord lines attached to a stave do not break the flow.
     } else {
       currentGroup = null;
     }
@@ -216,7 +216,8 @@ function renderTabGroup(container, staves, song, view, maxWidth) {
     const here = noteX.get(n.id);
     const next = notes.find((o) => o.string === n.string && o.beat > n.beat);
     const there = next && noteX.get(next.id);
-    const x = there && there.row === here.row ? (here.x + there.x) / 2 : here.x + 14;
+    // Vibrato belongs to its own note; the others connect two notes.
+    const x = n.tech !== '~' && there && there.row === here.row ? (here.x + there.x) / 2 : here.x + 15;
     const mark = el('span', 'ttech', escapeHtml(TECH_LABEL[n.tech] || n.tech));
     mark.style.left = `${x}px`;
     mark.style.top = `${TOP + n.string * STRING_GAP - 14}px`;
@@ -265,7 +266,7 @@ export function renderTab(sheet, song) {
       }
       continue;
     }
-    if (used.has(b.line)) continue;
+    if (used.has(b.line) || b.type === 'rhythm') continue; // rhythm is shown by the spacing
 
     if (b.type === 'blank') {
       if (!lastWasSpace) sheet.appendChild(el('div', 'spacer'));

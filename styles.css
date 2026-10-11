@@ -331,6 +331,10 @@ code {
   margin-top: 6px;
 }
 
+.line.rhythm {
+  color: var(--muted);
+}
+
 .line.chords {
   font-weight: 700;
 }
